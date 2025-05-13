@@ -1,6 +1,8 @@
-import { useState, useRef } from 'react';
-import { sendMessage } from '../services/api';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { sendMessage } from '../services/api';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+
 import {
   Input,
   Button,
@@ -8,6 +10,7 @@ import {
   Alert,
   Tooltip,
 } from 'antd';
+
 import {
   AudioOutlined,
   LoadingOutlined,
@@ -17,23 +20,20 @@ import {
 
 const { TextArea } = Input;
 
-declare global {
-  interface Window {
-    webkitSpeechRecognition: any;
-    SpeechRecognition: any;
-  }
-}
-
 export default function ChatPage() {
   const [message, setMessage] = useState('');
   const [response, setResponse] = useState('');
   const [history, setHistory] = useState<{ question: string; answer: string; date: Date }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [listening, setListening] = useState(false);
 
   const navigate = useNavigate();
-  const recognitionRef = useRef<any>(null);
+
+  const {
+    listening,
+    startListening,
+    stopListening,
+  } = useSpeechRecognition(setMessage, setError);
 
   const handleSend = async () => {
     if (!message.trim()) {
@@ -46,7 +46,6 @@ export default function ChatPage() {
       const res = await sendMessage(message);
       if (res?.error) {
         setError(res.error);
-        setLoading(false);
         return;
       }
 
@@ -63,43 +62,6 @@ export default function ChatPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleStartListening = () => {
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      setError('Браузер не поддерживает распознавание речи.');
-      return;
-    }
-
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    const recognition = new SpeechRecognition();
-    recognitionRef.current = recognition;
-    recognition.lang = 'ru-RU';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setMessage((prev) => (prev ? prev + ' ' + transcript : transcript));
-    };
-
-    recognition.onerror = (event) => {
-      setError('Ошибка распознавания речи: ' + event.error);
-    };
-
-    recognition.onend = () => {
-      setListening(false);
-    };
-
-    setListening(true);
-    recognition.start();
-  };
-
-  const handleStopListening = () => {
-    recognitionRef.current?.stop();
-    setListening(false);
   };
 
   return (
@@ -140,7 +102,6 @@ export default function ChatPage() {
             />
           </div>
 
-          {/* Кнопка отправки */}
           <Button
             type="primary"
             icon={<ArrowRightOutlined />}
@@ -149,12 +110,11 @@ export default function ChatPage() {
             className="absolute right-2 bottom-2 w-9 h-9 p-0 rounded-md flex justify-center items-center z-10"
           />
 
-          {/* Кнопка микрофона */}
           <Tooltip title={listening ? 'Остановить запись' : 'Говорите'}>
             <Button
               type={listening ? 'default' : 'primary'}
               icon={listening ? <LoadingOutlined /> : <AudioOutlined />}
-              onClick={listening ? handleStopListening : handleStartListening}
+              onClick={listening ? stopListening : startListening}
               className="absolute left-2 bottom-2 w-9 h-9 p-0 rounded-md bg-[#1e6fd9] text-white z-10"
             />
           </Tooltip>

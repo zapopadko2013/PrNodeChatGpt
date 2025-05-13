@@ -7,3 +7,4 @@ npm install
 npm run dev
 4. Запустить клиентскую часть можно командой:
 npm start
+5. Для работы с микрофоном нужно в файл service-account-key.json занести ключ из https://console.cloud.google.com/iam-admin/serviceaccounts
